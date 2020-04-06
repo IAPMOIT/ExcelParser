@@ -1,0 +1,24 @@
+﻿@using SQL_script_creator_2.Controllers;
+@model SQL_script_creator_2.Models.ExcelFile
+
+@{
+    ViewBag.Title = "Home Page";
+}
+
+@using (Html.BeginForm("SubmitExcelForScripting", "Home", FormMethod.Post, new {enctype = "multipart/form-data"}))
+{
+    <table>
+        <tr><td>&nbsp;</td></tr>
+        <tr class="standard">
+            <td>Excel File: </td>
+            <td>
+                <input type="file" name="UploadedFile" id="uploadedFile"/>
+            </td>
+        </tr>
+        <tr>
+            <td align="center" colspan="2">
+                <input type="submit" value="Upload Excel document"/>
+            </td>
+        </tr>
+    </table>
+}
