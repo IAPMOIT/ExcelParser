@@ -5,20 +5,48 @@
     ViewBag.Title = "Home Page";
 }
 
-@using (Html.BeginForm("SubmitExcelForScripting", "Home", FormMethod.Post, new {enctype = "multipart/form-data"}))
+@using (Html.BeginForm("SubmitExcelForScripting", "Home", FormMethod.Post, new { enctype = "multipart/form-data" }))
 {
     <table>
         <tr><td>&nbsp;</td></tr>
         <tr class="standard">
             <td>Excel File: </td>
             <td>
-                <input type="file" name="UploadedFile" id="uploadedFile"/>
+                <input type="file" name="UploadedFiles" id="uploadedFiles" />
             </td>
         </tr>
         <tr>
             <td align="center" colspan="2">
-                <input type="submit" value="Upload Excel document"/>
+                <input type="submit" value="Upload Excel document" />
             </td>
         </tr>
     </table>
 }
+
+@using (Html.BeginForm("SubmitExcelStandardImport", "Home", FormMethod.Post, new { enctype = "multipart/form-data" }))
+{  
+    @Html.AntiForgeryToken()  
+  
+    <div class="form-horizontal">  
+        <hr />  
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })  
+        <div class="form-group">  
+            @Html.LabelFor(model => model.UploadedFiles, htmlAttributes: new { @class = "control-label col-md-2" })  
+            <div class="col-md-10">  
+                @Html.TextBoxFor(model => model.UploadedFiles, "", new { @type = "file", @multiple = "multiple" })  
+                @Html.ValidationMessageFor(model => model.UploadedFiles, "", new { @class = "text-danger" })  
+            </div>  
+        </div>  
+        <div class="form-group">  
+            <div class="col-md-offset-2 col-md-10">  
+                <input type="submit"  value="Upload"  class="btn btn-primary" multiple/>  
+            </div>  
+        </div>  
+        <div class="form-group">  
+            <div class="col-md-offset-2 col-md-10 text-success">  
+                @ViewBag.UploadStatus  
+            </div>  
+        </div>  
+         
+    </div>  
+}  
