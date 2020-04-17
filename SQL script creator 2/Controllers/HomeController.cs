@@ -86,7 +86,7 @@ namespace SQL_script_creator_2.Controllers
 
 
             //Sql template to create.
-            var templateString = SqlTemplate.StandardsInsertSqlTemplate;
+            var templateString = SqlTemplate.StandardsInsertSqlTemplateWithOutputInsertToTemp;
 
             //List of fields we want to import. Only need to modify this list in order to add new fields to the import or remove existing fields.
             List<string> fieldNamesToBeImported = new List<string>()
@@ -103,18 +103,23 @@ namespace SQL_script_creator_2.Controllers
                 "standard_id"
             };
 
+            bool recordNewlyInsertedValuesToTempTable = true;
 
-            result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsStandards, fieldNamesToBeImported, templateString, "Standards", iterationCount));
+            result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsStandards, fieldNamesToBeImported, templateString, "Standards", recordNewlyInsertedValuesToTempTable, iterationCount));
 
             //Dealing with Superceding data second.
             //List of fields we want to import. Only need to modify this list in order to add new fields to the import or remove existing fields.
+            templateString = SqlTemplate.StandardsInsertSqlTemplate;
+
             List<string> fieldSuperNamesToBeImported = new List<string>()
             {
                 "oldStd",
                 "superStd"
             };
 
-            result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsSuper, fieldSuperNamesToBeImported, templateString, "StandardsSuperseded", iterationCount));
+            recordNewlyInsertedValuesToTempTable = false;
+
+            result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsSuper, fieldSuperNamesToBeImported, templateString, "StandardsSuperseded", recordNewlyInsertedValuesToTempTable, iterationCount));
 
             //Creating final merge statements to update the super results with the new ids form the standard insert statements.
             List<string> resultMerge = new List<string>();
@@ -133,15 +138,26 @@ namespace SQL_script_creator_2.Controllers
             workingString = workingString.Replace("FIELDSETTINGOPERATION", "s.superStd = s.newlyInsertedId");
             resultMerge.Add(workingString);
             workingString = "";
-
+            result.AddRange(resultMerge);
 
             result.Add(SqlTemplate.DropTempTable);
+
+            //Add column to standard table that olds the old standard IDs from Mirobase.
+            workingString = SqlTemplate.DropColumnFromTable;
+            workingString = workingString.Replace("TABLE", "Standards");
+            workingString = workingString.Replace("DROPPEDCOLUMN", "standard_id");
+
+            result.Add(workingString);
+            workingString = "";
+
+
+            WriteSqlStringListToFile(result, "standardAndSupercedeImportSql");
 
             return View("Index");
         }
 
         private static List<string> DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(DataTable excelDataSet,
-            List<string> fieldNamesToBeImported, string templateString, string tableName, int iterationCount = 2)
+            List<string> fieldNamesToBeImported, string templateString, string tableName, bool recordNewlyInsertedValuesToTempTable = false, int iterationCount = 2)
         {
             string workingString = ""; //Working string is manipulated to create the SQL statments. Always clear after each SQL statement generation section.
             List<string> result = new List<string>();
@@ -321,11 +337,16 @@ namespace SQL_script_creator_2.Controllers
                 result.Add(workingString);
             }
 
+            WriteSqlStringListToFile(result, "StandardsExcelDocImport");
+        }
+
+        private static void WriteSqlStringListToFile(List<string> sqlStringListToWriteResult, string newFileName)
+        {
             try
             {
-                using (StreamWriter writer = new StreamWriter("StandardsExcelDocImport.sql"))
+                using (StreamWriter writer = new StreamWriter("C:\\" + newFileName + ".sql"))
                 {
-                    foreach (string s in result)
+                    foreach (string s in sqlStringListToWriteResult)
                     {
                         writer.WriteLine(s);
                     }

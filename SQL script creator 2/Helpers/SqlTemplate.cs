@@ -14,12 +14,21 @@ namespace SQL_script_creator_2.Helpers
             }
         }
 
-        public static string StandardsInsertSqlTemplate
+        public static string StandardsInsertSqlTemplateWithOutputInsertToTemp
         {
             get
             {
                 return
                     @"INSERT INTO [dbo].[TABLE] (TFIELD) VALUES (TDATA) OUTPUT INSERTED.standard_id, INSERTED.Id INTO #WorkingTempTable";
+            }
+        }
+
+        public static string StandardsInsertSqlTemplate
+        {
+            get
+            {
+                return
+                    @"INSERT INTO [dbo].[TABLE] (TFIELD) VALUES (TDATA)";
             }
         }
 
@@ -47,6 +56,15 @@ namespace SQL_script_creator_2.Helpers
             {
                 return 
                     @"ALTER TABLE [dbo].[TABLE] ADD [NEWCOLUMN] DATATYPE NULLORNOT";
+            }
+        }
+
+        public static string DropColumnFromTable
+        {
+            get
+            {
+                return
+                    @"ALTER TABLE [dbo].[TABLE] DROP COLUMN [DROPPEDCOLUMN]";
             }
         }
 
