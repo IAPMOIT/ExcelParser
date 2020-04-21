@@ -19,7 +19,7 @@ namespace SQL_script_creator_2.Helpers
             get
             {
                 return
-                    @"INSERT INTO [dbo].[TABLE] (TFIELD) OUTPUT INSERTED.[standard_id], INSERTED.[Id] INTO #WorkingTempTable VALUES (TDATA)";
+                    @"INSERT INTO [dbo].[TABLE] (TFIELD) OUTPUT INSERTED.[standard_id], INSERTED.[Id] INTO #WorkingTempTable VALUES (TDATA) GO";
             }
         }
 
@@ -28,7 +28,7 @@ namespace SQL_script_creator_2.Helpers
             get
             {
                 return
-                    @"INSERT INTO [dbo].[TABLE] (TFIELD) VALUES (TDATA)";
+                    @"INSERT INTO [dbo].[TABLE] (TFIELD) VALUES (TDATA) GO";
             }
         }
 

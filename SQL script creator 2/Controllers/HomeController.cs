@@ -77,6 +77,9 @@ namespace SQL_script_creator_2.Controllers
             //Sql template to create.
             var templateString = SqlTemplate.StandardsInsertSqlTemplateWithOutputInsertToTemp;
 
+            WriteUtilties.WriteSqlStringListToFile(result, "standardAndSupercedeImportSql");
+            result.Clear();
+
             //List of fields we want to import. Only need to modify this list in order to add new fields to the import or remove existing fields.
             var fieldNamesToBeImported = new TupleList<string, string>()
             {
@@ -103,6 +106,9 @@ namespace SQL_script_creator_2.Controllers
                     fieldNamesToBeImported, templateString, "Standards", iterationCount));
             }
 
+            WriteUtilties.WriteSqlStringListToFile(result, "standardAndSupercedeImportSql");
+            result.Clear();
+
             //Dealing with Superceding data second.
             //List of fields we want to import. Only need to modify this list in order to add new fields to the import or remove existing fields.
             templateString = SqlTemplate.StandardsInsertSqlTemplate;
@@ -115,6 +121,9 @@ namespace SQL_script_creator_2.Controllers
 
             result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsSuper, fieldSuperNamesToBeImported, templateString, "StandardsSuperseded", iterationCount));
 
+            WriteUtilties.WriteSqlStringListToFile(result, "standardAndSupercedeImportSql");
+            result.Clear();
+
             //Creating final merge statements to update the super results with the new ids form the standard insert statements.
             result.Add(SqlGenerators.CreateMergeStatement("StandardsSuperseded", "#WorkingTempTable", "t.PreviousStandard_Id = s.oldId", "t.PreviousStandard_Id = s.newlyInsertedId"));
             result.Add(SqlGenerators.CreateMergeStatement("StandardsSuperseded", "#WorkingTempTable", "t.SupersededByStandard_Id = s.oldId", "t.SupersededByStandard_Id = s.newlyInsertedId"));
@@ -124,8 +133,8 @@ namespace SQL_script_creator_2.Controllers
             //Drop column to standard table that olds the old standard IDs from Mirobase.
             result.Add(SqlGenerators.RemoveColumnFromTable("Standards", "standard_id"));
 
-
-            WriteSqlStringListToFile(result, "standardAndSupercedeImportSql");
+            WriteUtilties.WriteSqlStringListToFile(result, "standardAndSupercedeImportSql");
+            result.Clear();
 
             return View("Index");
         }
@@ -143,7 +152,6 @@ namespace SQL_script_creator_2.Controllers
             string[] fieldNamesAsArray = excelDataSet.Columns.Cast<DataColumn>().Select(x => x.ColumnName).ToArray();
 
             //Create the SQL that will determine what fields will have values inserted into them.
-            int count = iterationCount;
             bool firstRow = true;
             foreach (Tuple<string, string> field in fieldNamesToBeImported)
             {
@@ -155,7 +163,6 @@ namespace SQL_script_creator_2.Controllers
                 }
 
                 newFieldNames += ",[" + field.Item2 + "]";
-                count++;
             }
 
             foreach (var item in fieldNamesToBeImported)
@@ -171,10 +178,10 @@ namespace SQL_script_creator_2.Controllers
 
             string tableData = "";
             bool firstDataInsert = true;
-            count = iterationCount;
+            int count = 0;
             foreach (DataRow d in excelDataSet.Rows)
             {
-                if (count > iterationCount)
+                if (count > iterationCount && iterationCount != 0)
                 {
                     break;
                 }
@@ -339,26 +346,7 @@ namespace SQL_script_creator_2.Controllers
                 result.Add(workingString);
             }
 
-            WriteSqlStringListToFile(result, "StandardsExcelDocImport");
-        }
-
-        private static void WriteSqlStringListToFile(List<string> sqlStringListToWriteResult, string newFileName)
-        {
-            try
-            {
-                using (StreamWriter writer = new StreamWriter("C:\\Users\\lee.howard\\Documents\\" + newFileName + ".sql"))
-                {
-                    foreach (string s in sqlStringListToWriteResult)
-                    {
-                        writer.WriteLine(s);
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                throw;
-            }
+            WriteUtilties.WriteSqlStringListToFile(result, "StandardsExcelDocImport");
         }
     }
 }
