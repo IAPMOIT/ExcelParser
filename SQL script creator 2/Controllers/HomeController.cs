@@ -68,87 +68,61 @@ namespace SQL_script_creator_2.Controllers
 
             int iterationCount = int.Parse(WebConfigurationManager.AppSettings["iterationCount"].ToString());
 
-            string workingString = "";
-            List<string> restTempAndCol = new List<string>();
-
-
             //Temp table is required if relationships need to be maintained across documents.
             //Add column to standard table that olds the old standard IDs from Mirobase.
-            workingString = SqlTemplate.AddColumnToTable;
-            workingString = workingString.Replace("NEWCOLUMN", "standard_id");
-            workingString = workingString.Replace("DATATYPE", "int");
-            workingString = workingString.Replace("NULLORNOT", "null");
-
-            result.Add(workingString);
+            result.Add(SqlGenerators.AddColumnToTable("Standards","standard_id", "int", "null"));
             result.Add(SqlTemplate.CreateTempTable);
-            workingString = "";
-
-
+            
 
             //Sql template to create.
             var templateString = SqlTemplate.StandardsInsertSqlTemplateWithOutputInsertToTemp;
 
             //List of fields we want to import. Only need to modify this list in order to add new fields to the import or remove existing fields.
-            List<string> fieldNamesToBeImported = new List<string>()
+            var fieldNamesToBeImported = new TupleList<string, string>()
             {
-                "standard_number",
-                "standard_title",
-                "agency",
-                "status",
-                "Remarks",
-                "accepted_by_src",
-                "side By Side Status",
-                "ics_code",
-                "keywords",
-                "standard_id"
+                {"standard_number", "StandardNumber"},
+                {"standard_title", "Title"},
+                {"agency","StandardAgency"},
+                //{"status","StandardStatusId"},
+                {"Remarks","Remarks"},
+                {"date_ok_src","AcceptedBySrc"},
+                //{"side By Side Status",""}, TBD.
+                //{"ics_code",""}, -- Not currently in the MyPLC Standard model yet.
+                {"keywords","SearchTags"},
+                {"standard_id","standard_id"},
             };
 
-            bool recordNewlyInsertedValuesToTempTable = true;
-
-            result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsStandards, fieldNamesToBeImported, templateString, "Standards", recordNewlyInsertedValuesToTempTable, iterationCount));
+            if (bool.Parse(WebConfigurationManager.AppSettings["addImportExceptionsForStandards"]))
+            {
+                result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsStandards,
+                    fieldNamesToBeImported, templateString, "Standards", iterationCount, true));
+            }
+            else
+            {
+                result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsStandards,
+                    fieldNamesToBeImported, templateString, "Standards", iterationCount));
+            }
 
             //Dealing with Superceding data second.
             //List of fields we want to import. Only need to modify this list in order to add new fields to the import or remove existing fields.
             templateString = SqlTemplate.StandardsInsertSqlTemplate;
 
-            List<string> fieldSuperNamesToBeImported = new List<string>()
+            var fieldSuperNamesToBeImported = new TupleList<string, string>()
             {
-                "oldStd",
-                "superStd"
+                {"oldStd","PreviousStandard_Id"},
+                {"superStd","SupersededByStandard_Id"}
             };
 
-            recordNewlyInsertedValuesToTempTable = false;
-
-            result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsSuper, fieldSuperNamesToBeImported, templateString, "StandardsSuperseded", recordNewlyInsertedValuesToTempTable, iterationCount));
+            result.AddRange(DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(dsSuper, fieldSuperNamesToBeImported, templateString, "StandardsSuperseded", iterationCount));
 
             //Creating final merge statements to update the super results with the new ids form the standard insert statements.
-            List<string> resultMerge = new List<string>();
-            workingString = SqlTemplate.MergeStatement;
-            workingString = workingString.Replace("TABLETARGET", "StandardsSuperseded");
-            workingString = workingString.Replace("TABLESOURCE", "#WorkingTempTable");
-            workingString = workingString.Replace("MATCHCONDITION", "t.oldStd = s.oldId");
-            workingString = workingString.Replace("FIELDSETTINGOPERATION", "t.oldStd = s.newlyInsertedId");
-            resultMerge.Add(workingString);
-            workingString = "";
-
-            workingString = SqlTemplate.MergeStatement;
-            workingString = workingString.Replace("TABLETARGET", "StandardsSuperseded");
-            workingString = workingString.Replace("TABLESOURCE", "#WorkingTempTable");
-            workingString = workingString.Replace("MATCHCONDITION", "t.superStd = s.oldId");
-            workingString = workingString.Replace("FIELDSETTINGOPERATION", "s.superStd = s.newlyInsertedId");
-            resultMerge.Add(workingString);
-            workingString = "";
-            result.AddRange(resultMerge);
+            result.Add(SqlGenerators.CreateMergeStatement("StandardsSuperseded", "#WorkingTempTable", "t.PreviousStandard_Id = s.oldId", "t.PreviousStandard_Id = s.newlyInsertedId"));
+            result.Add(SqlGenerators.CreateMergeStatement("StandardsSuperseded", "#WorkingTempTable", "t.SupersededByStandard_Id = s.oldId", "t.SupersededByStandard_Id = s.newlyInsertedId"));
 
             result.Add(SqlTemplate.DropTempTable);
 
-            //Add column to standard table that olds the old standard IDs from Mirobase.
-            workingString = SqlTemplate.DropColumnFromTable;
-            workingString = workingString.Replace("TABLE", "Standards");
-            workingString = workingString.Replace("DROPPEDCOLUMN", "standard_id");
-
-            result.Add(workingString);
-            workingString = "";
+            //Drop column to standard table that olds the old standard IDs from Mirobase.
+            result.Add(SqlGenerators.RemoveColumnFromTable("Standards", "standard_id"));
 
 
             WriteSqlStringListToFile(result, "standardAndSupercedeImportSql");
@@ -156,44 +130,42 @@ namespace SQL_script_creator_2.Controllers
             return View("Index");
         }
 
-        private static List<string> DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(DataTable excelDataSet,
-            List<string> fieldNamesToBeImported, string templateString, string tableName, bool recordNewlyInsertedValuesToTempTable = false, int iterationCount = 2)
+        private static List<string> DynamicallyExtractExcelDocumentDataAndCreateSqlInsertStatement(
+            DataTable excelDataSet,
+            TupleList<string, string> fieldNamesToBeImported, string templateString, string tableName,
+            int iterationCount = 2, bool addImportExceptionsForStandards = false)
         {
             string workingString = ""; //Working string is manipulated to create the SQL statments. Always clear after each SQL statement generation section.
             List<string> result = new List<string>();
 
             List<int> indexesToBeImported = new List<int>();
-            string fieldNames = "";
+            string newFieldNames = null;
             string[] fieldNamesAsArray = excelDataSet.Columns.Cast<DataColumn>().Select(x => x.ColumnName).ToArray();
 
-            //Creat the SQL that will determine what fields will have values inserted into them.
+            //Create the SQL that will determine what fields will have values inserted into them.
             int count = iterationCount;
             bool firstRow = true;
-            foreach (string field in fieldNamesToBeImported)
+            foreach (Tuple<string, string> field in fieldNamesToBeImported)
             {
-                if (count > iterationCount)
-                {
-                    break;
-                }
-
                 if (firstRow)
                 {
-                    fieldNames += "[" + field + "]";
+                    newFieldNames += "[" + field.Item2 + "]";
                     firstRow = false;
                     continue;
                 }
 
-                fieldNames += ",[" + field + "]";
+                newFieldNames += ",[" + field.Item2 + "]";
                 count++;
             }
 
-
-            //Get a list of index positions that will have values we need to grab from the excel document based on the import fields list above.
-            foreach (string s in fieldNamesAsArray)
+            foreach (var item in fieldNamesToBeImported)
             {
-                if (fieldNamesToBeImported.Contains(s))
+                for (int i = 0; i < fieldNamesAsArray.Length; i++)
                 {
-                    indexesToBeImported.Add(Array.IndexOf(fieldNamesAsArray, s));
+                    if (item.Item1 == fieldNamesAsArray[i])
+                    {
+                        indexesToBeImported.Add(i);
+                    }
                 }
             }
 
@@ -209,18 +181,48 @@ namespace SQL_script_creator_2.Controllers
 
                 workingString = templateString;
                 workingString = workingString.Replace("TABLE", tableName);
-                workingString = workingString.Replace("TFIELD", fieldNames);
+
+                if (addImportExceptionsForStandards)
+                {
+                    newFieldNames =
+                        AddBusinessLogicExtensions
+                            .AddExceptionsForStandardFields(
+                                newFieldNames); //This adds exceptions in the data that Mirobase doesn't hold.
+                }
+
+                workingString = workingString.Replace("TFIELD", newFieldNames);
 
                 foreach (int i in indexesToBeImported)
                 {
                     if (firstDataInsert)
                     {
-                        tableData += "\"" + d[i] + "\"";
+                        if (string.IsNullOrWhiteSpace(d[i].ToString()))
+                        {
+                            tableData += "null";
+                        }
+                        else
+                        {
+                            tableData += "'" + d[i] + "'";
+                        }
+
                         firstDataInsert = false;
                         continue;
                     }
 
-                    tableData += ", \"" + d[i] + "\"";
+                    if (string.IsNullOrWhiteSpace(d[i].ToString()))
+                    {
+                        tableData += ",null";
+                    }
+                    else
+                    {
+                        tableData += ", '" + d[i] + "'";
+                    }
+                        
+                }
+
+                if (addImportExceptionsForStandards)
+                {
+                    tableData = AddBusinessLogicExtensions.AddExceptionsForStandardValues(tableData);
                 }
 
                 workingString = workingString.Replace("TDATA", tableData);
@@ -344,7 +346,7 @@ namespace SQL_script_creator_2.Controllers
         {
             try
             {
-                using (StreamWriter writer = new StreamWriter("C:\\" + newFileName + ".sql"))
+                using (StreamWriter writer = new StreamWriter("C:\\Users\\lee.howard\\Documents\\" + newFileName + ".sql"))
                 {
                     foreach (string s in sqlStringListToWriteResult)
                     {

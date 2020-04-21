@@ -19,7 +19,7 @@ namespace SQL_script_creator_2.Helpers
             get
             {
                 return
-                    @"INSERT INTO [dbo].[TABLE] (TFIELD) VALUES (TDATA) OUTPUT INSERTED.standard_id, INSERTED.Id INTO #WorkingTempTable";
+                    @"INSERT INTO [dbo].[TABLE] (TFIELD) OUTPUT INSERTED.[standard_id], INSERTED.[Id] INTO #WorkingTempTable VALUES (TDATA)";
             }
         }
 
@@ -54,8 +54,10 @@ namespace SQL_script_creator_2.Helpers
         {
             get
             {
-                return 
-                    @"ALTER TABLE [dbo].[TABLE] ADD [NEWCOLUMN] DATATYPE NULLORNOT";
+                return
+                    @"IF NOT EXISTS(SELECT * FROM   sys.columns WHERE  object_id = OBJECT_ID(N'[dbo].[TABLE]')AND name = 'NEWCOLUMN') BEGIN ALTER TABLE [dbo].[TABLE] ADD [NEWCOLUMN] DATATYPE NULLORNOT END";
+
+                
             }
         }
 
@@ -64,7 +66,8 @@ namespace SQL_script_creator_2.Helpers
             get
             {
                 return
-                    @"ALTER TABLE [dbo].[TABLE] DROP COLUMN [DROPPEDCOLUMN]";
+                    @"IF EXISTS(SELECT * FROM   sys.columns WHERE  object_id = OBJECT_ID(N'[dbo].[TABLE]')AND name = 'DROPPEDCOLUMN') BEGIN ALTER TABLE [dbo].[TABLE] DROP COLUMN [DROPPEDCOLUMN] END";
+                
             }
         }
 
